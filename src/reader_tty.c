@@ -4,7 +4,7 @@ void reader_tty_init(const char *device)
 {
     int sockfd;
     struct reader_tty_t rtty;
-    struct reader_sock_t rsock;
+    struct reader_sock_t rsock = {0};
 
     if ((rtty.fd = open(device, O_RDWR | O_NOCTTY)) < 0) {
         perror(device);
@@ -19,17 +19,15 @@ void reader_tty_init(const char *device)
     tcflush(rtty.fd, TCIFLUSH);
     tcsetattr(rtty.fd, TCSANOW, &(rtty.tty));
 
-    reader_sock_new(&rsock);
-
     while (1) {
-        reader_sock_accept(&rsock);
-
         rtty.res = read(rtty.fd, rtty.buf, sizeof(rtty.buf));
         rtty.buf[rtty.res] = 0;
 
-        if (rtty.res > 1) {
-            reader_sock_send(&(rsock.newsock), rtty.buf, &(rtty.res));
-            printf("Sended: %s", rtty.buf);
+        if (rtty.res > 1 && strcmp(rtty.buf, "No card\n") != 0) {
+            reader_sock_connect(&rsock);
+
+            reader_sock_send(&rsock, &rtty);
+            printf("Sended to %s:%d: %s", HOST, PORT, rtty.buf);
         }
     }
 }

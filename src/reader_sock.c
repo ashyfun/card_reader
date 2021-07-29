@@ -1,11 +1,14 @@
 #include "reader_sock.h"
 
-void reader_sock_new(struct reader_sock_t *rsock)
+void reader_sock_connect(struct reader_sock_t *rsock)
 {
+    close(rsock->newsock);
+    memset(rsock, 0, sizeof(*rsock));
+
     rsock->opt = 1;
     rsock->addrlen = sizeof(rsock->addr);
 
-    if ((rsock->sockfd = socket(AF_INET, SOCK_STREAM, 0)) == 0) {
+    if ((rsock->sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
         perror("Socket()");
         exit(EXIT_FAILURE);
     }
@@ -16,29 +19,23 @@ void reader_sock_new(struct reader_sock_t *rsock)
     }
 
     (rsock->addr).sin_family = AF_INET;
-    (rsock->addr).sin_addr.s_addr = INADDR_ANY;
+    (rsock->addr).sin_addr.s_addr = inet_addr(HOST);
     (rsock->addr).sin_port = htons(PORT);
 
-    if (bind(rsock->sockfd, (struct sockaddr *) &(rsock->addr), sizeof(rsock->addr)) < 0) {
-        perror("Bind()");
-        exit(EXIT_FAILURE);
-    }
-
-    if (listen(rsock->sockfd, 3) < 0) {
-        perror("Listen()");
+    if (connect(rsock->sockfd, (struct sockaddr *) &(rsock->addr), sizeof(rsock->addr)) < 0) {
+        perror("Connect()");
         exit(EXIT_FAILURE);
     }
 }
 
-void reader_sock_accept(struct reader_sock_t *rsock)
+void reader_sock_send(struct reader_sock_t *rsock, struct reader_tty_t *rtty)
 {
-    if (rsock->newsock == 0 && (rsock->newsock = accept(rsock->sockfd, (struct sockaddr *) &(rsock->addr), (socklen_t *) &(rsock->addrlen))) < 0) {
-        perror("Accept()");
+    char *card = reader_card_extract(rtty);
+
+    if (send(rsock->newsock, card, strlen(card), 0) < 0) {
+        perror("Send()");
         exit(EXIT_FAILURE);
     }
-}
 
-void reader_sock_send(int *newsock, const char *msg, int *size)
-{
-    send(*newsock, msg, *size, 0);
+    free(card);
 }
